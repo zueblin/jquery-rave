@@ -1,6 +1,6 @@
 (function( $ ){
 	
-  var boundElements = [];
+  var boundFields = {};
   var ongoingValidations = 0;
   //define the events that cause 
   var stateChangeEvents = {
@@ -17,36 +17,54 @@
   var methods = {
     init : function( options ) { 
       return this.each(function(){
-    	  console.log('something was added:'+$(this).attr("id")); 
-          var $this = $(this);
-          boundElements.push($this);
-          var data = $this.data('databind');
-          //supported states: initial, valid, invalid, revalidate
-          if ( ! data ) {
-            $(this).data('databind', {
-                target : $this,
-                value : $this.val(),
-                state : 'initial',
-                options : options
-            });
+    	  console.log('something was added:'+$(this).attr("id"));
+    	  
+    	  var $this = $(this);
+    	  
+    	  var internalId = methods.getInternalId($this);
+    	  
+    	  //associate internal id with the field
+    	  var data = $this.data('databind');
+    	  if ( ! data ) {
+              $(this).data('databind', {
+                  internalId : internalId                  
+              });
           }
+    	  
+    	  //create data object for field
+    	  //supported states: initial, valid, invalid, revalidate
+    	  
+    	  if (boundFields[internalId] == null){
+    		  boundFields[internalId] = {
+    	                targets : [$this.context],
+    	                state : 'initial',
+    	                options : options
+    	            }  
+    	  }else{
+    		  boundFields[internalId].targets.push($this.context);
+    	  }
+    	  var fieldValue = methods.getValue(internalId);
+    	  //store current value 
+    	  boundFields[internalId].value = fieldValue;
           
-          var elementType = methods.getElementType($(this));
+          var elementType = methods.getElementType($this);
           //TODO allow passing the events as options
           var stateChangeEvent = stateChangeEvents[elementType];
           var reValidateEvent = triggerValidationEvents[elementType];
           
           $(this).on(stateChangeEvent, function(){
-        	  var newValue = $(this).val();
-        	  var oldValue = $(this).data('databind').value
+        	  var internalId = $(this).data('databind').internalId;
+        	  var newValue = methods.getValue(internalId);
+        	  var oldValue = boundFields[internalId].value;
         	  if (newValue != oldValue){
-        		  console.log('valuechange, state of '+$(this).attr("id")+" was reset to undefind"); 
-        		  $(this).data('databind').value = newValue;
-        		  $(this).data('databind').state = 'revalidate';
+        		  console.log('valuechange, state of '+internalId+" was reset to undefind"); 
+        		  boundFields[internalId].value = newValue;
+        		  boundFields[internalId].state = 'revalidate';
         	  }
           });
           $(this).on(reValidateEvent, function(){
-        	  if ($(this).data('databind').state == 'revalidate'){
+        	  var internalId = $(this).data('databind').internalId;
+        	  if (boundFields[internalId].state == 'revalidate'){
         		  ongoingValidations++;
         		  methods.validateField(this)
         	  }
@@ -60,9 +78,9 @@
     		return;
     	}
     	var valid = true;
-    	jQuery.each(boundElements, function(){
-    		valid &= $(this).data('databind').state == 'valid';
-    		console.log($(this).data('databind').state);
+    	jQuery.each(boundFields, function(key, value){
+    		valid &= value.state == 'valid';
+    		console.log(value.state);
     	});
     	console.log("global state is:"+valid);
     	if (valid){
@@ -74,17 +92,18 @@
     
     validateField : function(field) {
     	field = $(field);
-		console.log('need to validate '+field.attr("id"));
+    	var internalId = field.data('databind').internalId;
+		console.log('need to validate '+internalId);
 		field.trigger('databind_validation_pending');
-		field.data('databind').options.validate(field, function(result){
+		boundFields[internalId].options.validate($(boundFields[internalId].targets), function(result){
 			if (result == true){
-				console.log('valid '+field.attr("id"));
+				console.log('valid '+internalId);
 				field.trigger('databind_validation_valid');
-				field.data('databind').state = 'valid';
+				boundFields[internalId].state = 'valid';
 			}else{
-				console.log('invalid '+field.attr("id"));
+				console.log('invalid '+internalId);
 				field.trigger('databind_validation_invalid');
-				field.data('databind').state = 'invalid';
+				boundFields[internalId].state = 'invalid';
 			}
 	  		ongoingValidations--;
 	  		methods.evaluateGlobalState();
@@ -93,11 +112,11 @@
     
     validateAll : function(){
     	console.log("global validation");    	
-    	jQuery.each(boundElements, function(){
-    		if ($(this).data('databind').state == 'initial'){
-    			$(this).data('databind').state = 'revalidate';
+    	jQuery.each(boundFields, function(key, value){
+    		if (value.state == 'initial'){
+    			value.state = 'revalidate';
     		}
-    		if ($(this).data('databind').state == 'revalidate'){
+    		if (value.state == 'revalidate'){
     			ongoingValidations++;
     		}
     	});
@@ -105,9 +124,9 @@
     	if (ongoingValidations == 0){
     		methods.evaluateGlobalState();
     	}else{
-    		jQuery.each(boundElements, function(){
-    			if ($(this).data('databind').state == 'revalidate'){
-    				methods.validateField($(this));
+    		jQuery.each(boundElements, function(key, value){
+    			if (value.state == 'revalidate'){
+    				methods.validateField($(value.targets));
     			}
     		});
     	}
@@ -126,7 +145,35 @@
     	if ($(field).is("input:checkbox")){
     		return "checkbox";
     	}
+    },
+    
+    getInternalId : function(field){
+    	if ($(field).is("select")){
+    		return $(field).attr("id");
+    	} 	
+    	if ($(field).is("input:text")){
+    		return $(field).attr("id");
+    	}
+    	if ($(field).is("input:radio")){
+    		return $(field).attr("name");
+    	}
+    	if ($(field).is("input:checkbox")){
+    		return $(field).attr("name");
+    	}
+    },
+    
+    getValue : function(internalId){
+    	var targets = boundFields[internalId].targets;
+    	var value;
+    	if (targets.length <= 1){
+    		value = $(targets).val();
+    	}else{
+    		value = jQuery(targets).filter(':checked').val();
+    	}
+    	console.log("internalId:"+internalId+" value:"+value);
+    	return value;
     }
+    
   };
 
   $.fn.databind = function( method ) {

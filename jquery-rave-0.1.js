@@ -1,8 +1,19 @@
+/*!
+ * Real Asynchronous Validation Engine, jQuery plugin
+ *
+ * Copyright(c) 2012, Thomas Zueblin
+ *
+ * Validation framework tailored for both synchronous clientside and asynchronous 
+ * serverside validation of form input fields.
+ *
+ * Licensed under the MIT License
+ */
+
 (function( $ ){
 
 	var boundFields = {};
 	var ongoingValidations = 0;
-	//define the events that cause 
+	//define the events that potentially cause an element to become invalid 
 	var stateChangeEvents = {
 			"text": "keyup",
 			"select": "change",
@@ -23,63 +34,63 @@
 
 					var $this = $(this);
 
-					var internalId, elementType;
+					var internalKey, elementType;
 					//analyse element type and define an internal key to be used to store data about the element
 					if ($this.is("select")){
-						internalId = $this.attr("id");
+						internalKey = $this.attr("id");
 						elementType = "select";
 					}else if ($this.is("input:text")){
-						internalId = $this.attr("id");
+						internalKey = $this.attr("id");
 						elementType = "text";
 					}else if ($this.is("input:radio")){
-						internalId = $this.attr("name");
+						internalKey = $this.attr("name");
 						elementType = "radio";
 					}else if ($this.is("input:checkbox")){
-						internalId = $this.attr("name");
+						internalKey = $this.attr("name");
 						elementType = "checkbox";
 					}
 					//associate internal id with the field
 					var data = $this.data('databind');
 					if ( ! data ) {
 						$(this).data('databind', {
-							internalId : internalId
+							internalKey : internalKey
 						});
 					}
 
 					//add the field to the boundFields hash
 					//supported states: initial, valid, invalid, revalidate
-					if (boundFields[internalId] == null){
-						boundFields[internalId] = {
+					if (boundFields[internalKey] == null){
+						boundFields[internalKey] = {
 								targets : [$this.context],
 								state : 'initial',
 								options : options,
 								type : elementType
 						}  
 					}else{
-						boundFields[internalId].targets.push($this.context);
+						boundFields[internalKey].targets.push($this.context);
 					}
 					//retrieve field value (method depends on the fieldtype)
-					var fieldValue = methods.getValue(internalId);
+					var fieldValue = methods.getValue(internalKey);
 					//store current value 
-					boundFields[internalId].value = fieldValue;
+					boundFields[internalKey].value = fieldValue;
 
 					//TODO allow passing the events as options
 					var stateChangeEvent = stateChangeEvents[elementType];
 					var reValidateEvent = triggerValidationEvents[elementType];
 
 					$this.on(stateChangeEvent, function(){
-						var internalId = $(this).data('databind').internalId;
-						var newValue = methods.getValue(internalId);
-						var oldValue = boundFields[internalId].value;
+						var internalKey = $(this).data('databind').internalKey;
+						var newValue = methods.getValue(internalKey);
+						var oldValue = boundFields[internalKey].value;
 						if (newValue != oldValue){
-							console.log('valuechange, state of '+internalId+" was reset to undefind"); 
-							boundFields[internalId].value = newValue;
-							boundFields[internalId].state = 'revalidate';
+							console.log('valuechange, state of '+internalKey+" was reset to undefind"); 
+							boundFields[internalKey].value = newValue;
+							boundFields[internalKey].state = 'revalidate';
 						}
 					});
 					$this.on(reValidateEvent, function(){
-						var internalId = $(this).data('databind').internalId;
-						if (boundFields[internalId].state == 'revalidate'){
+						var internalKey = $(this).data('databind').internalKey;
+						if (boundFields[internalKey].state == 'revalidate'){
 							ongoingValidations++;
 							methods.validateField(this)
 						}
@@ -100,31 +111,50 @@
 				});
 				console.log("global state is:"+valid);
 				if (valid){
-					$.event.trigger('databind.globalState', {state:"valid"});
+					$.event.trigger('global_validation_result', {state:"valid"});
 				}else{
-					$.event.trigger('databind.globalState', {state:"invalid"});
+					$.event.trigger('global_validation_result', {state:"invalid"});
 				}
 			},
 
 			validateField : function(field) {
 				field = $(field);
-				var internalId = field.data('databind').internalId;
-				console.log('need to validate '+internalId);
-				field.trigger('databind_validation_pending');
-				boundFields[internalId].options.validate($(boundFields[internalId].targets), function(result){
-					if (result == true){
-						console.log('valid '+internalId);
-						field.trigger('databind_validation_valid');
-						boundFields[internalId].state = 'valid';
-					}else{
-						console.log('invalid '+internalId);
-						field.trigger('databind_validation_invalid');
-						boundFields[internalId].state = 'invalid';
-					}
-					ongoingValidations--;
-					methods.evaluateGlobalState();
-				});  	  	
+				var internalKey = field.data('databind').internalKey;
+				console.log('need to validate '+internalKey);
+				field.trigger('validation_pending');
+				// create a copy of the validator array
+				var validators = boundFields[internalKey].options.validate.slice(0);
+				methods.recursiveValidateField(validators, $(boundFields[internalKey].targets), internalKey, field);
 			},
+			
+			recursiveValidateField : function(validatorArray, targets, internalKey, field){
+			  var singleValidation = validatorArray.shift();
+			  $.when(singleValidation(targets)).then(function(data){
+				  console.log("got result:"+data.state);
+				  // if valid and there are more validators in the array, to the next one
+				  if (data.state === "valid" && validatorArray.length > 0){
+					  methods.recursiveValidateField(validatorArray, targets, internalKey, field);
+				  }else{
+					  //otherwise we are either done with all validators, or the last one returned invalid
+					  methods.handleValidationResult(data, internalKey, field);
+				  }
+			  });
+			},
+			
+			handleValidationResult : function (data, internalKey, field){
+				if (data.state === "valid"){
+					console.log('valid '+internalKey);
+					field.trigger('validation_valid');
+					boundFields[internalKey].state = 'valid';
+				}else{
+					console.log('invalid '+internalKey);
+					field.trigger('validation_invalid');
+					boundFields[internalKey].state = 'invalid';
+				}
+				ongoingValidations--;
+				methods.evaluateGlobalState();
+			},
+
 
 			validateAll : function(){
 				console.log("global validation");    	
@@ -148,9 +178,9 @@
 				}
 			},
 
-			getValue : function(internalId){
-				var targets = boundFields[internalId].targets;
-				var type = boundFields[internalId].type;
+			getValue : function(internalKey){
+				var targets = boundFields[internalKey].targets;
+				var type = boundFields[internalKey].type;
 				var value;
 
 				switch (type) {
@@ -168,13 +198,13 @@
 						jQuery(targets).filter(':checked').each(function(){value.push($(this).val())});
 						break;
 				}
-				console.log("internalId:"+internalId+" value:"+value);
+				console.log("internalKey:"+internalKey+" value:"+value);
 				return value;
 			}
 
 	};
 
-	$.fn.databind = function( method ) {
+	$.fn.validate = function( method ) {
 
 		// Method calling logic
 		if ( methods[method] ) {

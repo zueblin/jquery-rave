@@ -3,7 +3,7 @@
  *
  * Copyright(c) 2012, Thomas Zueblin
  *
- * Validation framework tailored for both synchronous clientside and asynchronous 
+ * Validation framework tailored for asynchronous 
  * serverside validation of form input fields.
  *
  * Licensed under the MIT License

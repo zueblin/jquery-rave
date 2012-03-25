@@ -11,24 +11,14 @@
 
 (function( $ ){
 
+	//internal object used to store info about all monitored fields
 	var boundFields = {};
+	//tracks current ongoing validations
 	var ongoingValidations = 0;
 	//define the events that potentially cause an element to become invalid 
-	var stateChangeEvents = {
-			"text": "keyup",
-			"select": "change",
-			"radio": "change",
-			"checkbox": "change"
-	};
-	var triggerValidationEvents = {
-			"text": "blur",
-			"select": "change",
-			"radio": "change",
-			"checkbox": "change"
-	};
-
+	
 	var methods = {
-			init : function( options ) { 
+			init : function( options ) {
 				return this.each(function(){
 					console.log('something was added:'+$(this).attr("id"));
 
@@ -50,81 +40,75 @@
 						elementType = "checkbox";
 					}
 					//associate internal id with the field
-					var data = $this.data('databind');
+					var data = $this.data('rave');
 					if ( ! data ) {
-						$(this).data('databind', {
+						$(this).data('rave', {
 							internalKey : internalKey
 						});
 					}
+					
+					// merge the user supplied options with the option defaults for the elementtype
+					var fieldOptions = $.extend({}, fieldDefaults[elementType], options);
 
-					//add the field to the boundFields hash
-					//supported states: initial, valid, invalid, revalidate
+					/*
+					 * initial : while a field is in initial state and doesn't change its value, 
+					 * 				it is not validated even if the triggerValidationEvent is fired
+					 * valid : Field has been validated and is valid
+					 * invalid : Field has been validated and is invalid
+					 * revalidate : Field needs to be revalidated (value changed) 
+					 * pending : Field is currently being validated
+					 */
+
+					//add the field to the boundFields object
 					if (boundFields[internalKey] == null){
 						boundFields[internalKey] = {
 								targets : [$this.context],
 								state : 'initial',
-								options : options,
+								options : fieldOptions,
 								type : elementType
 						}  
 					}else{
+						//radio and checkbox fields that share the same name are stored as one validation unit 
 						boundFields[internalKey].targets.push($this.context);
 					}
-					//retrieve field value (method depends on the fieldtype)
-					var fieldValue = methods.getValue(internalKey);
-					//store current value 
-					boundFields[internalKey].value = fieldValue;
+					
+					var fieldData = boundFields[internalKey];
+					//retrieve current field value (method depends on the fieldtype) and store it
+					fieldData.value = fieldData.options.getValue(fieldData.targets);
 
-					//TODO allow passing the events as options
-					var stateChangeEvent = stateChangeEvents[elementType];
-					var reValidateEvent = triggerValidationEvents[elementType];
-
-					$this.on(stateChangeEvent, function(){
-						var internalKey = $(this).data('databind').internalKey;
-						var newValue = methods.getValue(internalKey);
-						var oldValue = boundFields[internalKey].value;
+					// register stateChangeEvent
+					$this.on(fieldData.options.stateChangeEvent, function(){
+						var internalKey = $(this).data('rave').internalKey;
+						var fieldData = boundFields[internalKey];
+						
+						var newValue = fieldData.options.getValue(fieldData.targets);
+						var oldValue = fieldData.value;
 						if (newValue != oldValue){
 							console.log('valuechange, state of '+internalKey+" was reset to undefind"); 
 							boundFields[internalKey].value = newValue;
 							boundFields[internalKey].state = 'revalidate';
 						}
 					});
-					$this.on(reValidateEvent, function(){
-						var internalKey = $(this).data('databind').internalKey;
+					// register triggerValidationEvent
+					$this.on(fieldData.options.triggerValidationEvent, function(){
+						var internalKey = $(this).data('rave').internalKey;
 						if (boundFields[internalKey].state == 'revalidate'){
-							ongoingValidations++;
 							methods.validateField(this)
 						}
 					});
 				});
 			},
-			evaluateGlobalState : function( ) {
-				console.log("checking global state.");
-				//overall state of cannot is undefined while validations are still running
-				if (ongoingValidations != 0){
-					//$.event.trigger('databind.globalState', {"state": "pending"});
-					return;
-				}
-				var valid = true;
-				jQuery.each(boundFields, function(key, value){
-					valid &= value.state == 'valid';
-					console.log(key+" is "+value.state);
-				});
-				console.log("global state is:"+valid);
-				if (valid){
-					$.event.trigger('global_validation_result', {state:"valid"});
-				}else{
-					$.event.trigger('global_validation_result', {state:"invalid"});
-				}
-			},
 
 			validateField : function(field) {
-				field = $(field);
-				var internalKey = field.data('databind').internalKey;
+				$field = $(field);
+				var internalKey = $field.data('rave').internalKey;
+				ongoingValidations++;
+				boundFields[internalKey].state = 'pending'
 				console.log('need to validate '+internalKey);
-				field.trigger('validation_pending');
+				$field.trigger('validation_pending');
 				// create a copy of the validator array
 				var validators = boundFields[internalKey].options.validate.slice(0);
-				methods.recursiveValidateField(validators, $(boundFields[internalKey].targets), internalKey, field);
+				methods.recursiveValidateField(validators, $(boundFields[internalKey].targets), internalKey, $field);
 			},
 			
 			recursiveValidateField : function(validatorArray, targets, internalKey, field){
@@ -177,31 +161,81 @@
 					});
 				}
 			},
-
-			getValue : function(internalKey){
-				var targets = boundFields[internalKey].targets;
-				var type = boundFields[internalKey].type;
-				var value;
-
-				switch (type) {
-					case "select": 
-						value = $(targets).val();
-						break;
-					case "text": 
-						value = $(targets).val();
-						break;
-					case "radio": 
-						value = jQuery(targets).filter(':checked').val();
-						break;
-					case "checkbox": 
-						value = [];
-						jQuery(targets).filter(':checked').each(function(){value.push($(this).val())});
-						break;
+			
+			evaluateGlobalState : function( ) {
+				console.log("checking global state.");
+				//overall state of cannot is undefined while validations are still running
+				if (ongoingValidations != 0){
+					//$.event.trigger('databind.globalState', {"state": "pending"});
+					return;
 				}
-				console.log("internalKey:"+internalKey+" value:"+value);
-				return value;
+				var valid = true;
+				jQuery.each(boundFields, function(key, value){
+					valid &= value.state == 'valid';
+					console.log(key+" is "+value.state);
+				});
+				console.log("global state is:"+valid);
+				if (valid){
+					$.event.trigger('global_validation_result', {state:"valid"});
+				}else{
+					$.event.trigger('global_validation_result', {state:"invalid"});
+				}
+			},
+			
+			/**
+			 * returns the value of a text or select input field
+			 * @param targets an array containing DOM nodes
+			 * 			 */
+			getFieldValue : function(targets){
+				return $(targets).val();
+			},
+			
+			/**
+			 * returns the value of the currently selected radio
+			 * @param targets an array containing DOM nodes
+			 */
+			getRadioValue : function(targets){
+				return jQuery(targets).filter(':checked').val();
+			},
+			
+			/**
+			 * returns an array containing all values of checked checkboxes
+			 * @param targets an array containing DOM nodes
+			 */
+			getCheckboxValue : function(targets){
+				values = [];
+				jQuery(targets).filter(':checked').each(function(){
+					values.push($(this).val())
+				});
+				return values;
 			}
 
+	};
+	/**
+	 * Default configuration depending on field type
+	 * 
+	 */
+	var fieldDefaults = {
+			'text' : {
+				'stateChangeEvent' : 'keyup',
+				'triggerValidationEvent' : 'blur',
+				'getValue' : methods.getFieldValue
+			},
+			'select' : {
+				'stateChangeEvent' : 'change',
+				'triggerValidationEvent' : 'change',
+				'getValue' : methods.getFieldValue
+			},
+			'radio' : {
+				'stateChangeEvent' : 'change',
+				'triggerValidationEvent' : 'change',
+				'getValue' : methods.getRadioValue
+			},
+			'checkbox' : {
+				'stateChangeEvent' : 'change',
+				'triggerValidationEvent' : 'change',
+				'getValue' : methods.getCheckboxValue
+			}
 	};
 
 	$.fn.validate = function( method ) {
@@ -212,7 +246,7 @@
 		} else if ( typeof method === 'object' || ! method ) {
 			return methods.init.apply( this, arguments );
 		} else {
-			$.error( 'Method ' +  method + ' does not exist on jQuery.databind' );
+			$.error( 'Method ' +  method + ' does not exist on jQuery-rave' );
 		}    
 
 	};

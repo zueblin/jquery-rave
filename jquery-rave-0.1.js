@@ -18,8 +18,8 @@
   var methods = {
     init : function(options) {
       return this.each(function() {
-        methods.log('something was added:' + $(this).attr("id"));
         var $this = $(this);
+        methods.log('Added: ' + $this.attr("id"));
         var internalKey, elementType;
         // analyse element type and define an internal key to be used to store data about the
         // element
@@ -36,7 +36,7 @@
           internalKey = $this.attr("name");
           elementType = "checkbox";
         } else {
-          methods.log('unsupported fieldtype:' + $(this).attr("id"));
+          methods.log('Unsupported field type found: ' + $this.attr("id"));
           return;
         }
         // associate internal id with the field

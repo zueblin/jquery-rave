@@ -194,9 +194,8 @@
     },
     evaluateGlobalState : function() {
       methods.log("checking global state.");
-      // overall state of cannot is undefined while validations are still running
+      // overall state is undefined while validations are still running
       if (ongoingValidations !== 0) {
-        // $.event.trigger('databind.globalState', {"state": "pending"});
         return;
       }
       var valid = true;
@@ -240,7 +239,7 @@
     getCheckboxValue : function(targets) {
       var values = [];
       jQuery(targets).filter(':checked').each(function() {
-        values.push($(this).val())
+        values.push($(this).val());
       });
       return values;
     },

@@ -64,7 +64,7 @@
             options : fieldOptions,
             type : elementType,
             skip : false
-          }
+          };
         } else {
           // radio and checkbox fields that share the same name are stored as one validation unit
           boundFields[internalKey].targets.push($this.context);
@@ -91,7 +91,7 @@
           return function(callback, ms){
             clearTimeout (timer);
             timer = setTimeout(callback, ms);
-          }  
+          };
         })();
         // register triggerValidationEvent
         //TODO we're always using delayedCall, even with delays of 0.
@@ -165,7 +165,7 @@
         
         // if scope was provided, check if the field is a decendant of scope, only validate if that is true
         var inScope;
-        if (typeof scope == 'undefined'){
+        if (typeof scope === 'undefined'){
           inScope = true;
         } else{
           inScope = jQuery(scope).find($(field.targets[0])).length > 0; 

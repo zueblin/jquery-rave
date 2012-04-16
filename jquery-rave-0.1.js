@@ -168,7 +168,7 @@
         if (typeof scope === 'undefined'){
           inScope = true;
         } else{
-          inScope = jQuery(scope).find($(field.targets[0])).length > 0; 
+          inScope = jQuery(scope).parents($(field.targets[0])).length > 0; 
         } 
         // update skip info 
         field.skip = !inScope || methods.isSkipped(field);
@@ -201,7 +201,7 @@
       var valid = true;
       jQuery.each(boundFields, function(key, value) {
         //boundField must be valid or currently skipped
-        valid &= value.state === 'valid' || value.skip;
+        valid = value.state === 'valid' || value.skip;
         methods.log(key + " is " + value.state);
       });
       methods.log("global state is:" + valid);
@@ -257,14 +257,13 @@
     },
     
     log : function(msg){
-      var debug = false;
+      var debug = true;
       if (debug === true){
         console.log(msg);
       }
     }
-    
-    
   };
+  
   /**
    * Default configuration depending on field type
    * 
@@ -299,6 +298,7 @@
       delayValidation : 0
     }
   };
+  
   $.fn.validate = function(method) {
     // Method calling logic
     if (methods[method]) {

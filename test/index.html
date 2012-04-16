@@ -18,29 +18,21 @@
 
 	<div id="qunit-fixture">
 	  <form id="form1">
-	    <input id="input_text" type="text" size="20" value="2"><span class="msg"></span><br><br>
+      <!-- valid input, numeric values allowed -->
+	    <input id="input_text1" type="text" size="20" value="2"><span class="msg"></span><br><br>
 	  </form>
+    
+    <form id="form2">
+      <!-- valid input, numeric values allowed  -->
+      <div id="form2-div1">
+        <input id="input_text2" type="text" value="2" />
+      </div> 
+      <!-- invalid input -->
+      <input id="input_text3" type="text" value="qwer" /> 
+    </form>
 	</div>
 	
 </body>
 
-<script type="text/javascript">
-  
-  var remoteValidation = function(field){
-    console.log('starting remotevalidation'+$(field).attr('id'));
-    return $.ajax({
-      url: 'validate/form1',
-    });
-  };
-
-  $('input_text').on('validation_valid', function(event, data){
-    $(this).nextAll('.msg').first().text("valid");
-    return false;
-  });
-
-  $(document).ready(function() {
-    $('#input_text').validate({validate:[remoteValidation]});
-  });
-</script>
 
 </html>

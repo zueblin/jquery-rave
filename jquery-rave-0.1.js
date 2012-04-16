@@ -168,7 +168,7 @@
         if (typeof scope === 'undefined'){
           inScope = true;
         } else{
-          inScope = jQuery(scope).parents($(field.targets[0])).length > 0; 
+          inScope = jQuery(scope).find($(field.targets[0])).length > 0;
         } 
         // update skip info 
         field.skip = !inScope || methods.isSkipped(field);

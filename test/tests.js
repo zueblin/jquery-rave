@@ -42,10 +42,12 @@ test('evaluate global state', function() {
     ok(true, 'evaluate globale state called');
   });
   
+  $(document).off();
   $.mockjaxClear();
 });
 
 // testing the scope functionality
+module("scope");
 test('scope test', function() {
   expect(1);
   

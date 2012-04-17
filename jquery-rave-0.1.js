@@ -18,8 +18,8 @@
   var methods = {
     init : function(options) {
       return this.each(function() {
-        methods.log('something was added:' + $(this).attr("id"));
         var $this = $(this);
+        methods.log('Added: ' + $this.attr("id"));
         var internalKey, elementType;
         // analyse element type and define an internal key to be used to store data about the
         // element
@@ -36,7 +36,7 @@
           internalKey = $this.attr("name");
           elementType = "checkbox";
         } else {
-          methods.log('unsupported fieldtype:' + $(this).attr("id"));
+          methods.log('Unsupported field type found: ' + $this.attr("id"));
           return;
         }
         // associate internal id with the field
@@ -64,7 +64,7 @@
             options : fieldOptions,
             type : elementType,
             skip : false
-          }
+          };
         } else {
           // radio and checkbox fields that share the same name are stored as one validation unit
           boundFields[internalKey].targets.push($this.context);
@@ -91,7 +91,7 @@
           return function(callback, ms){
             clearTimeout (timer);
             timer = setTimeout(callback, ms);
-          }  
+          };
         })();
         // register triggerValidationEvent
         //TODO we're always using delayedCall, even with delays of 0.
@@ -165,10 +165,10 @@
         
         // if scope was provided, check if the field is a decendant of scope, only validate if that is true
         var inScope;
-        if (typeof scope == 'undefined'){
+        if (typeof scope === 'undefined'){
           inScope = true;
         } else{
-          inScope = jQuery(scope).find($(field.targets[0])).length > 0; 
+          inScope = jQuery(scope).find($(field.targets[0])).length > 0;
         } 
         // update skip info 
         field.skip = !inScope || methods.isSkipped(field);
@@ -194,15 +194,14 @@
     },
     evaluateGlobalState : function() {
       methods.log("checking global state.");
-      // overall state of cannot is undefined while validations are still running
+      // overall state is undefined while validations are still running
       if (ongoingValidations !== 0) {
-        // $.event.trigger('databind.globalState', {"state": "pending"});
         return;
       }
       var valid = true;
       jQuery.each(boundFields, function(key, value) {
         //boundField must be valid or currently skipped
-        valid &= value.state === 'valid' || value.skip;
+        valid = value.state === 'valid' || value.skip;
         methods.log(key + " is " + value.state);
       });
       methods.log("global state is:" + valid);
@@ -240,7 +239,7 @@
     getCheckboxValue : function(targets) {
       var values = [];
       jQuery(targets).filter(':checked').each(function() {
-        values.push($(this).val())
+        values.push($(this).val());
       });
       return values;
     },
@@ -258,14 +257,13 @@
     },
     
     log : function(msg){
-      var debug = false;
+      var debug = true;
       if (debug === true){
         console.log(msg);
       }
     }
-    
-    
   };
+  
   /**
    * Default configuration depending on field type
    * 
@@ -300,6 +298,7 @@
       delayValidation : 0
     }
   };
+  
   $.fn.validate = function(method) {
     // Method calling logic
     if (methods[method]) {

@@ -201,7 +201,7 @@
       var valid = true;
       jQuery.each(boundFields, function(key, value) {
         //boundField must be valid or currently skipped
-        valid = value.state === 'valid' || value.skip;
+        valid &= value.state === 'valid' || value.skip;
         methods.log(key + " is " + value.state);
       });
       methods.log("global state is:" + valid);
